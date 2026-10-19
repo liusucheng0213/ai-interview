@@ -1,0 +1,156 @@
+
+# --------------------------
+# 1. 依赖与包管理
+# --------------------------
+node_modules/
+.pnpm-store/
+frontend/node_modules/
+
+# 锁文件建议纳入版本控制，按团队实际策略开启
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# --------------------------
+# 2. 前端构建产物
+# --------------------------
+dist/
+dist-ssr/
+build/
+.output/
+.nuxt/
+.next/
+.astro/
+
+# --------------------------
+# 3. 环境变量（绝对不能上传）
+# --------------------------
+.env
+.env.example.local
+.env.local
+.env.development
+.env.production
+.env.test
+.env.*.local
+backend/.env
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# --------------------------
+# 4. 日志文件
+# --------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --------------------------
+# 5. 后端运行时文件
+# --------------------------
+uploads/
+backend/app/uploads/
+files/
+static/files/
+temp/
+tmp/
+# 按用户 ID 存放的知识库原文，属于本地上传数据
+backend/app/storage/
+*.pid
+*.seed
+*.pid.lock
+
+# --------------------------
+# 5.1 Python / FastAPI 运行与构建
+# --------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.python-version
+
+# 虚拟环境
+venv/
+.venv/
+env/
+ENV/
+backend/venv/
+backend/.venv/
+
+# Python 打包产物
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# 测试与类型检查缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# --------------------------
+# 6. 数据库文件
+# --------------------------
+*.db
+*.sqlite
+*.sqlite3
+prisma/dev.db
+prisma/migrations/*.db
+data/
+dump/
+backup/
+
+# --------------------------
+# 6.1 向量库与模型缓存
+# --------------------------
+backend/app/chroma_db/
+backend/chroma_db/
+chroma_db/
+**/models_rag/
+
+# --------------------------
+# 7. 编辑器 / IDE 配置
+# --------------------------
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# --------------------------
+# 8. 系统垃圾文件
+# --------------------------
+.DS_Store
+Thumbs.db
+$RECYCLE.BIN/
+
+# --------------------------
+# 9. 测试 / 覆盖率
+# --------------------------
+coverage/
+.nyc_output/
+
+# --------------------------
+# 10. 其他缓存
+# --------------------------
+.cache/
+.parcel-cache/
+.temp/
+
+# --------------------------
+# 11. 密钥与证书
+# --------------------------
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+credentials.json
+service-account*.json
