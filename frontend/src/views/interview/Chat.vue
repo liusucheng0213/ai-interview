@@ -1342,27 +1342,29 @@ const sendMessage = async () => {
         const rawData = line.slice(6).trim()
         if (!rawData) continue
 
+        let parsed
         try {
-          const parsed = JSON.parse(rawData)
-          if (parsed.type === 'chunk' && parsed.text) {
-            fullText += parsed.text
-            messages.value[aiMsgIndex].content = fullText
-            currentQuestion.value = fullText
-            scrollToBottom()
-          } else if (parsed.type === 'done') {
-            fullText = parsed.full_text || fullText
-            messages.value[aiMsgIndex].content = fullText
-            currentQuestion.value = fullText
-            // 将回答分析回填到用户消息
-            if (parsed.answer_analysis) {
-              messages.value[userMsgIndex].analysis = parsed.answer_analysis
-            }
-            lastDonePayload = parsed
-          } else if (parsed.type === 'error') {
-            throw new Error(parsed.message || '流式响应异常')
-          }
-        } catch (parseErr) {
+          parsed = JSON.parse(rawData)
+        } catch {
           console.warn('SSE 解析跳过:', rawData)
+          continue
+        }
+        if (parsed.type === 'chunk' && parsed.text) {
+          fullText += parsed.text
+          messages.value[aiMsgIndex].content = fullText
+          currentQuestion.value = fullText
+          scrollToBottom()
+        } else if (parsed.type === 'done') {
+          fullText = parsed.full_text || fullText
+          messages.value[aiMsgIndex].content = fullText
+          currentQuestion.value = fullText
+          // 将回答分析回填到用户消息
+          if (parsed.answer_analysis) {
+            messages.value[userMsgIndex].analysis = parsed.answer_analysis
+          }
+          lastDonePayload = parsed
+        } else if (parsed.type === 'error') {
+          throw new Error(parsed.message || '流式响应异常')
         }
       }
     }
@@ -1464,7 +1466,11 @@ const sendVoiceToBackend = async (audioBlob, duration) => {
       return
     }
 
-    const nextQuestion = data.next_question || '请继续'
+    const nextQuestion = data.next_question
+    if (!nextQuestion) {
+      notifyError('没有拿到下一题，请重试', '语音面试')
+      return
+    }
 
     lastUserAnswer.value = transcribedText
     // 保存最新分析结果供语音模式展示
@@ -1476,11 +1482,8 @@ const sendVoiceToBackend = async (audioBlob, duration) => {
     setTimeout(() => speakQuestion(nextQuestion, { forceLocal: interviewMode.value === 'video' }), 500)
   } catch (err) {
     console.error('提交语音失败:', err)
-    const mockResponse = '很好，接下来请谈谈你在实际项目中遇到的挑战。'
     lastUserAnswer.value = '[语音识别失败，请重试]'
-    setAiQuestion(mockResponse)
-    setTimeout(() => speakQuestion(mockResponse, { forceLocal: interviewMode.value === 'video' }), 500)
-    // 静默降级：语音识别异常时使用模拟回复
+    notifyError('提交语音失败：' + (err.message || '未知错误'), '语音面试')
   } finally {
     loading.value = false
   }
@@ -1675,10 +1678,7 @@ const sendVideoToBackend = async (videoBlob) => {
     // 不弹窗提示视频分析完成
   } catch (err) {
     console.error('视频上传失败:', err)
-    const mockQ = '很好！接下来请谈谈你在项目中遇到的最大挑战是什么？'
-    setAiQuestion(mockQ)
-    setTimeout(() => speakQuestion(mockQ, { forceLocal: true }), 1000)
-    // 静默降级：后端不可用时使用模拟问题
+    notifyError('视频回答提交失败：' + (err.message || '未知错误'), '视频面试')
   } finally {
     loading.value = false
   }

@@ -1,16 +1,9 @@
 """
-LLM 配置模块 - 阿里云百炼 DashScope（LangChain 集成）
+LLM 配置 - DeepSeek（OpenAI 兼容接口）。
 
-七类模型分工（环境变量可覆盖，默认值与业务角色对齐）：
-1. 向量 Embedding：text-embedding-v3（见 rag_conf.RAG_USE_DASHSCOPE_EMBEDDING，非本文件 Chat模型）
-2. 音视频多模态：DASHSCOPE_MODEL_OMNI → qwen3.5-omni-flash（视频帧/多模态分析，低延迟）
-3. 面试对话：DASHSCOPE_MODEL_INTERVIEW → qwen-turbo（多轮提问，每次仅一个问题）
-4. 报告/成长计划：DASHSCOPE_MODEL_REPORT → qwen-max（长文本结构化评估与路线）
-5. 简历解析（视觉/结构化 JSON）：DASHSCOPE_MODEL_RESUME_VL → qwen-vl-max-latest（可改）
-6. 知识图谱/入库结构化：DASHSCOPE_MODEL_KNOWLEDGE_GRAPH → qwen-plus（实体关系抽取）
-7. 全局兜底：DASHSCOPE_MODEL → qwen-turbo
-
-优化：_build_llm() 按 (model_name, streaming) 缓存 ChatOpenAI 实例。
+对话、报告、简历结构化、知识抽取、视频帧理解都使用 deepseek-flash。
+DeepSeek 不提供 Embedding，向量检索走本地 bge（见 rag_conf）。
+思考模式默认关闭：面试流式输出需要尽快看到正文，JSON 任务也不等待思维链。
 """
 
 import logging
@@ -25,34 +18,37 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # ==================== 环境变量 ====================
-DASHSCOPE_API_KEY: str = os.getenv("DASHSCOPE_API_KEY", "")
-DASHSCOPE_BASE_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "").strip()
+DEEPSEEK_BASE_URL: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
+DEEPSEEK_TIMEOUT: int = int(os.getenv("DEEPSEEK_TIMEOUT", "120"))
+DEEPSEEK_MODEL: str = os.getenv("DEEPSEEK_MODEL", "deepseek-flash").strip() or "deepseek-flash"
+DEEPSEEK_THINKING: bool = os.getenv("DEEPSEEK_THINKING", "disabled").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "enabled",
+    "on",
+)
 
-# 默认/回退模型（全局兜底）
-DASHSCOPE_MODEL: str = os.getenv("DASHSCOPE_MODEL", "qwen-turbo")
-DASHSCOPE_TIMEOUT: int = int(os.getenv("DASHSCOPE_TIMEOUT", "60"))
 
-# 3. 面试对话
-MODEL_INTERVIEW: str = os.getenv("DASHSCOPE_MODEL_INTERVIEW", "qwen-turbo")
-# 4. 报告与成长计划
-MODEL_REPORT: str = os.getenv("DASHSCOPE_MODEL_REPORT", "qwen-max")
-# 5. 简历解析（结构化 JSON，与视觉简历解析同模型族；默认用最新快照名）
-MODEL_RESUME_VL: str = os.getenv("DASHSCOPE_MODEL_RESUME_VL", "qwen-vl-max-latest")
-MODEL_RESUME_OPTIMIZE: str = os.getenv("DASHSCOPE_MODEL_RESUME_OPTIMIZE", "qwen-plus")
-# 6. 知识图谱 / 入库结构化
-MODEL_KNOWLEDGE_GRAPH: str = os.getenv("DASHSCOPE_MODEL_KNOWLEDGE_GRAPH", "qwen-plus")
-# 2. 音视频多模态面试分析（视频帧等）
-MODEL_OMNI_INTERVIEW: str = os.getenv("DASHSCOPE_MODEL_OMNI", "qwen3.5-omni-flash")
+def _env_model(name: str, default: str) -> str:
+    return os.getenv(name, default).strip() or default
 
-# 视觉模型（Omni 失败时回落）
-QWEN_VL_MODEL: str = os.getenv("QWEN_VL_MODEL", MODEL_RESUME_VL)
-QWEN_VL_TIMEOUT: int = int(os.getenv("QWEN_VL_TIMEOUT", "60"))
+
+MODEL_INTERVIEW: str = _env_model("DEEPSEEK_MODEL_INTERVIEW", DEEPSEEK_MODEL)
+MODEL_REPORT: str = _env_model("DEEPSEEK_MODEL_REPORT", DEEPSEEK_MODEL)
+MODEL_RESUME_VL: str = _env_model("DEEPSEEK_MODEL_RESUME", DEEPSEEK_MODEL)
+MODEL_RESUME_OPTIMIZE: str = _env_model("DEEPSEEK_MODEL_RESUME_OPTIMIZE", DEEPSEEK_MODEL)
+MODEL_KNOWLEDGE_GRAPH: str = _env_model("DEEPSEEK_MODEL_KNOWLEDGE", DEEPSEEK_MODEL)
+MODEL_VISION: str = _env_model("DEEPSEEK_MODEL_VISION", DEEPSEEK_MODEL)
+DEEPSEEK_VISION_TIMEOUT: int = int(os.getenv("DEEPSEEK_VISION_TIMEOUT", "60"))
+
 WHISPER_MODEL_NAME: str = os.getenv("WHISPER_MODEL_NAME", "small")
 ASR_LANGUAGE: str = os.getenv("ASR_LANGUAGE", "zh")
 
-_api_key_ok = bool(DASHSCOPE_API_KEY and DASHSCOPE_API_KEY != "请填写你的阿里云百炼API_KEY")
+_api_key_ok = bool(DEEPSEEK_API_KEY)
 if not _api_key_ok:
-    logger.warning("DASHSCOPE_API_KEY 未配置，请在 .env 中填写阿里云百炼 API Key")
+    logger.warning("DEEPSEEK_API_KEY 未配置，请在 backend/.env 中填写 DeepSeek API Key")
 
 # ==================== 提示词模板 ====================
 
@@ -414,38 +410,60 @@ PROMPT_RESUME_OPTIMIZE = """你是专业的简历优化专家，请对以下简�
 
 
 # ==================== LangChain LLM 客户端缓存 ====================
-# key: (model_name, streaming) → ChatOpenAI 实例
-# 避免每次调用都新建 httpx 连接池
-_llm_cache: Dict[Tuple[str, bool], ChatOpenAI] = {}
+# key: (model_name, streaming, thinking) → ChatOpenAI 实例
+_llm_cache: Dict[Tuple[str, bool, bool], ChatOpenAI] = {}
+
+
+def deepseek_extra_body() -> Dict[str, object]:
+    mode = "enabled" if DEEPSEEK_THINKING else "disabled"
+    return {"thinking": {"type": mode}}
+
+
+def message_text(content) -> str:
+    """LangChain 有时把正文做成字符串，有时做成内容块列表。"""
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                parts.append(str(item.get("text") or ""))
+            else:
+                text = getattr(item, "text", None)
+                if text:
+                    parts.append(str(text))
+        return "".join(parts)
+    return str(content)
 
 
 def _build_llm(streaming: bool = False, model: Optional[str] = None) -> ChatOpenAI:
     """
     返回缓存的 ChatOpenAI 实例。
-    相同 (model, streaming) 组合只创建一次，后续复用同一连接池。
-
-    Args:
-        streaming: 是否启用流式输出
-        model:     指定模型名称，None 时使用 DASHSCOPE_MODEL
+    相同 (model, streaming, thinking) 组合只创建一次。
     """
     if not _api_key_ok:
         raise RuntimeError(
-            "DASHSCOPE_API_KEY 未配置！请在 backend/.env 中填写阿里云百炼 API Key。\n"
-            "获取地址：https://bailian.console.aliyun.com/"
+            "DEEPSEEK_API_KEY 未配置！请在 backend/.env 中填写 DeepSeek API Key。\n"
+            "获取地址：https://platform.deepseek.com/"
         )
 
-    _model = model or DASHSCOPE_MODEL
-    key = (_model, streaming)
+    _model = model or DEEPSEEK_MODEL
+    key = (_model, streaming, DEEPSEEK_THINKING)
 
     if key not in _llm_cache:
         _llm_cache[key] = ChatOpenAI(
-            api_key=DASHSCOPE_API_KEY,
-            base_url=DASHSCOPE_BASE_URL,
+            api_key=DEEPSEEK_API_KEY,
+            base_url=DEEPSEEK_BASE_URL,
             model=_model,
             temperature=0.7,
-            timeout=DASHSCOPE_TIMEOUT,
+            timeout=DEEPSEEK_TIMEOUT,
             streaming=streaming,
             max_retries=2,
+            extra_body=deepseek_extra_body(),
         )
 
     return _llm_cache[key]
@@ -459,13 +477,12 @@ async def call_llm(
     model: Optional[str] = None,
 ) -> str:
     """
-    调用 DashScope LLM（非流式），等待完整响应后返回。
+    调用 DeepSeek（非流式），等待完整响应后返回。
 
     Args:
         prompt:        用户侧提示词
         system_prompt: 系统角色提示词，None 时使用默认面试官提示词
-        model:         指定模型（None 则用 DASHSCOPE_MODEL），可传入
-                       MODEL_INTERVIEW / MODEL_REPORT / MODEL_RESUME_VL 等常量
+        model:         指定模型（None 则用 DEEPSEEK_MODEL）
 
     Returns:
         AI 回复的完整文本
@@ -473,7 +490,7 @@ async def call_llm(
     if system_prompt is None:
         system_prompt = SYSTEM_PROMPT_INTERVIEWER
 
-    _model = model or DASHSCOPE_MODEL
+    _model = model or DEEPSEEK_MODEL
     messages = []
     if system_prompt:
         messages.append(SystemMessage(content=system_prompt))
@@ -482,7 +499,7 @@ async def call_llm(
     try:
         llm = _build_llm(streaming=False, model=_model)
         response = await llm.ainvoke(messages)
-        content = response.content
+        content = message_text(response.content)
         # 全局兜底：空响应时避免上层崩溃
         if content is None or (isinstance(content, str) and not content.strip()):
             return "（模型未返回有效文本，请检查网络、模型名与配额；可稍后重试或联系管理员。）"
@@ -502,7 +519,7 @@ async def call_llm_stream(
     model: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """
-    调用 DashScope LLM（流式），逐 token 异步生成响应。
+    调用 DeepSeek（流式），逐段异步生成响应。
 
     Args:
         prompt:        用户侧提示词
@@ -524,8 +541,9 @@ async def call_llm_stream(
     try:
         llm = _build_llm(streaming=True, model=_model)
         async for chunk in llm.astream(messages):
-            if chunk.content:
-                yield chunk.content
+            text = message_text(chunk.content)
+            if text:
+                yield text
     except RuntimeError:
         raise
     except Exception as e:

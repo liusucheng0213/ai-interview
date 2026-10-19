@@ -1,29 +1,28 @@
-"""Chroma 子集合 + 本地向量或 DashScope Embedding；DashScope 失败时自动降级本地。"""
+"""Chroma 子集合 + 本地 bge 向量。DeepSeek 没有 Embedding 接口。"""
 import asyncio
 import logging
 import os
 from typing import Optional
 
 import chromadb
-from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
 MODEL_DIMENSION = int(os.getenv("RAG_EMBEDDING_DIMENSION", "512"))
-# 本地向量模型目录（仅当 RAG_USE_DASHSCOPE_EMBEDDING 未开启时使用）
+# bge-small-zh-v1.5 的向量维度是 512。云端 1024 维向量不能和它混在同一个集合里。
 EMBEDDING_MODEL_PATH = os.getenv(
     "RAG_LOCAL_EMBEDDING_MODEL_PATH",
     "./models_rag/bge-small-zh-v1.5",
 )
 CHROMA_DB_PATH = "./chroma_db"
 CHILD_COLLECTION_NAME = os.getenv("CHROMA_CHILD_COLLECTION_NAME", "kb_child_chunks")
-RAG_USE_DASHSCOPE_EMBEDDING: bool = os.getenv("RAG_USE_DASHSCOPE_EMBEDDING", "").lower() in (
-    "1",
-    "true",
-    "yes",
-)
+if os.getenv("RAG_USE_DASHSCOPE_EMBEDDING", "").lower() in ("1", "true", "yes"):
+    logger.warning(
+        "已忽略 RAG_USE_DASHSCOPE_EMBEDDING：DeepSeek 不提供向量接口，知识库改用本地 bge-small-zh。"
+        "若之前用过云端向量，请重新上传知识库。"
+    )
 
-embedding_model: Optional[SentenceTransformer] = None
+embedding_model = None
 chroma_client: Optional[chromadb.Client] = None
 child_collection = None
 
@@ -39,7 +38,7 @@ __all__ = [
 ]
 
 
-def initialize_embedding_model() -> Optional[SentenceTransformer]:
+def initialize_embedding_model():
     global embedding_model
 
     if not os.path.exists(EMBEDDING_MODEL_PATH):
@@ -47,6 +46,8 @@ def initialize_embedding_model() -> Optional[SentenceTransformer]:
         return None
 
     try:
+        from sentence_transformers import SentenceTransformer
+
         embedding_model = SentenceTransformer(EMBEDDING_MODEL_PATH)
         embedding_model.encode("测试", convert_to_numpy=True)
         logger.info("嵌入模型加载成功，设备：%s", embedding_model.device)
@@ -80,43 +81,18 @@ def initialize_chroma_db() -> None:
     logger.info("子块集合 %s 就绪，文档数：%s", CHILD_COLLECTION_NAME, n)
 
 
-def _create_probed_dashscope_wrapper():
-    from services.kb.dashscope_embed import DashScopeEmbeddingWrapper
-
-    w = DashScopeEmbeddingWrapper()
-    w.encode("rag-init-probe", convert_to_numpy=True)
-    return w
-
-
 async def init_rag() -> None:
     global embedding_model, chroma_client, child_collection
 
     loop = asyncio.get_running_loop()
     logger.info("RAG 初始化（线程池）...")
-    chroma_future = loop.run_in_executor(None, initialize_chroma_db)
-    await chroma_future
+    await loop.run_in_executor(None, initialize_chroma_db)
 
-    if RAG_USE_DASHSCOPE_EMBEDDING:
-        try:
-            embedding_model = await loop.run_in_executor(None, _create_probed_dashscope_wrapper)
-            logger.info(
-                "RAG 使用 DashScope 向量（%s），集合：%s",
-                getattr(embedding_model, "model", "?"),
-                CHILD_COLLECTION_NAME,
-            )
-        except Exception as e:
-            logger.warning("DashScope 向量不可用，降级本地嵌入：%s", e)
-            embedding_model = await loop.run_in_executor(None, initialize_embedding_model)
-            if embedding_model is None:
-                logger.warning("本地嵌入未加载，语义检索不可用")
-            else:
-                logger.info("RAG 已降级为本地嵌入模型")
+    embedding_model = await loop.run_in_executor(None, initialize_embedding_model)
+    if embedding_model is None:
+        logger.warning("本地嵌入未加载，语义检索不可用。请确认 %s 存在", EMBEDDING_MODEL_PATH)
     else:
-        embedding_model = await loop.run_in_executor(None, initialize_embedding_model)
-        if embedding_model is None:
-            logger.warning("嵌入模型未加载，语义检索不可用")
-        else:
-            logger.info("RAG 本地嵌入模型加载完成")
+        logger.info("RAG 使用本地嵌入模型，集合：%s", CHILD_COLLECTION_NAME)
 
     logger.info("RAG 初始化完成")
 

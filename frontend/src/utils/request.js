@@ -33,6 +33,13 @@ service.interceptors.response.use(
     return response.data
   },
   (error) => {
+    const data = error.response?.data
+    if (data && typeof data === 'object' && !(data instanceof Blob)) {
+      const serverMsg = data.message || data.detail
+      if (typeof serverMsg === 'string' && serverMsg.trim()) {
+        error.message = serverMsg
+      }
+    }
     // 🌟 Token 过期/无效/未携带，统一跳登录
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('token') // 清除无效 Token

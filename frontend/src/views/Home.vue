@@ -236,7 +236,7 @@
             <h3>9. 视频面试与表情分析</h3>
             <ul>
               <li>需在浏览器中授权摄像头与麦克风；录制格式一般为 WebM，后端会抽帧做非语言分析。</li>
-              <li>视频分析依赖阿里云百炼 <b>Qwen-VL</b> 系列模型，请在服务器环境变量 <code>QWEN_VL_MODEL</code> 中配置支持图文的型号（如 <code>qwen-vl-plus</code>、<code>qwen-vl-max-latest</code>）。若误配实时语音模型（如含 <code>realtime</code>、<code>omni</code> 且非 VL），可能导致接口只返回 <code>request_id</code> 而无分析结果。</li>
+              <li>视频画面分析使用 DeepSeek 的 <b>deepseek-flash</b>（支持看图）。请在后端 <code>.env</code> 配置 <code>DEEPSEEK_API_KEY</code>。知识库向量不走 DeepSeek，使用本地 bge 模型。</li>
               <li>界面上的「实时情感」为录制过程中的前端示意；每轮提交后的详细分析以后端返回为准。</li>
             </ul>
           </section>

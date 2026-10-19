@@ -71,6 +71,21 @@ router = APIRouter(prefix="/api/interview")
 
 # ==================== 工具函数 ====================
 
+def _assert_same_interview(interview_id, history) -> None:
+    """语音/视频表单里的 interview_id 必须对上当前这场，避免答到别的进行中记录。"""
+    if interview_id is None:
+        return
+    text = str(interview_id).strip()
+    if text.lower() in {"", "none", "null", "undefined"}:
+        return
+    try:
+        parsed = int(text)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="interview_id 无效")
+    if parsed != history.id:
+        raise HTTPException(status_code=400, detail="interview_id 与当前进行中的面试不一致")
+
+
 def _extract_last_ai_question(chat_context: str) -> str:
     """从对话历史中提取最近一条面试官问题（用于评估上下文）"""
     if not chat_context:
@@ -1033,7 +1048,7 @@ async def submit_text_answer_stream(
 
 @router.post("/answer/speech", summary="提交语音回答")
 async def submit_speech_answer(
-    interview_id: str = Form(None),
+    interview_id: Optional[str] = Form(None),
     job_id: int = Form(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -1054,6 +1069,7 @@ async def submit_speech_answer(
             raise HTTPException(status_code=404, detail="未找到进行中的面试记录")
         if history.job_id != job_id:
             raise HTTPException(status_code=403, detail="job_id 与当前面试不一致")
+        _assert_same_interview(interview_id, history)
 
         position_name = history.position_name
         job_id = history.job_id
@@ -1074,6 +1090,10 @@ async def submit_speech_answer(
         logger.info(f"[语音回答] 音频已保存：{audio_path}，大小：{len(audio_content)} bytes")
 
         if len(audio_content) < 512:
+            try:
+                os.remove(audio_path)
+            except Exception:
+                pass
             raise HTTPException(status_code=400, detail="录音文件过小，请检查麦克风权限并重新录制")
 
         # 获取音频时长（PyAV 可解码 webm；wave 模块只能处理标准 WAV）
@@ -1182,7 +1202,7 @@ async def submit_speech_answer(
 
 @router.post("/answer/video", summary="提交视频回答（含表情分析）")
 async def submit_video_answer(
-    interview_id: int = Form(None),
+    interview_id: Optional[str] = Form(None),
     job_id: int = Form(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -1203,6 +1223,7 @@ async def submit_video_answer(
             raise HTTPException(status_code=404, detail="未找到进行中的面试记录")
         if history.job_id != job_id:
             raise HTTPException(status_code=403, detail="job_id 与当前面试不一致")
+        _assert_same_interview(interview_id, history)
 
         position_name = history.position_name
         job_id = history.job_id
@@ -1222,13 +1243,17 @@ async def submit_video_answer(
 
         if actual_size < 1024:
             logger.warning(f"[视频回答] 视频文件过小（{actual_size} bytes），跳过帧分析")
+            try:
+                os.remove(video_path)
+            except Exception:
+                pass
             return {
                 "analysis": {}, "next_question": "请重新录制视频，确保录制时长超过2秒",
                 "expression": "录制时间过短", "psychology": "", "body_language": "",
                 "score": 0, "suggestions": "请保证录制时长至少5秒",
             }
 
-        # 表情分析（Qwen-VL）
+        # 表情分析（DeepSeek 视觉）
         video_analysis = await analyze_video_expression(video_path)
 
         # 从视频提取音频并识别（需要 FFmpeg）

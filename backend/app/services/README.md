@@ -10,5 +10,5 @@
 - `kb/`：知识库入库、检索、计划服务与向量管理。
 
 ## 调用关系
-`routers` 调用 `services`，`services` 再调用 `crud`、`models` 与第三方能力（Qwen、Chroma、Whisper等）。
+`routers` 调用 `services`，`services` 再调用 `crud`、`models` 与第三方能力（DeepSeek、Chroma、Whisper 等）。
 

@@ -5,8 +5,7 @@
 
 ## 包含模块
 - `src/`：前端源码。
-- `public/`：静态资源。
-- `scripts/`：构建辅助脚本。
+- `vendor/avatar_sdk/`：讯飞虚拟人前端 SDK。
 - `package.json`：Node 依赖与运行脚本。
 - `vite.config.js`：构建与代理配置。
 

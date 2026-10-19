@@ -127,7 +127,7 @@ export async function submitTextAnswerStream(interviewId, answer, jobId) {
     })
     if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.detail || `请求失败：HTTP ${response.status}`)
+        throw new Error(errData.message || errData.detail || `请求失败：HTTP ${response.status}`)
     }
     return response.body
 }

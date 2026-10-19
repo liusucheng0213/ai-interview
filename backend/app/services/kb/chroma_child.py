@@ -37,11 +37,18 @@ def add_child_embeddings(
         for x in items
     ]
 
-    if embed_model is not None:
-        emb = embed_model.encode(docs).tolist()
+    if embed_model is None:
+        raise RuntimeError("嵌入模型未加载，无法写入知识库向量")
+    emb = embed_model.encode(docs).tolist()
+    try:
         col.add(ids=ids, embeddings=emb, documents=docs, metadatas=metas)
-    else:
-        col.add(ids=ids, documents=docs, metadatas=metas)
+    except Exception as e:
+        if "dimension" in str(e).lower():
+            raise RuntimeError(
+                "向量维度与已有知识库不一致。DeepSeek 不提供向量模型，当前使用本地 bge（512 维）。"
+                "请重新上传知识库后再试。"
+            ) from e
+        raise
 
     logger.info(f"[RAG v2] 写入 Chroma 子块 {len(ids)} 条")
 
@@ -85,12 +92,21 @@ def query_children(
     n = col.count()
     n_results = min(max(top_k * 4, top_k), max(n, 1))
     where = {"file_id": str(file_id)} if file_id is not None else None
-    raw = col.query(
-        query_embeddings=q_emb,
-        n_results=n_results,
-        where=where,
-        include=["documents", "metadatas", "distances"],
-    )
+    try:
+        raw = col.query(
+            query_embeddings=q_emb,
+            n_results=n_results,
+            where=where,
+            include=["documents", "metadatas", "distances"],
+        )
+    except Exception as e:
+        if "dimension" in str(e).lower():
+            logger.error(
+                "检索向量维度与知识库不一致，请重新上传知识库。当前嵌入为本地 bge。详情：%s",
+                e,
+            )
+            return []
+        raise
     docs = raw.get("documents", [[]])[0]
     metas = raw.get("metadatas", [[]])[0]
     dists = raw.get("distances", [[]])[0]

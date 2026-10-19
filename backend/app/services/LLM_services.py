@@ -6,7 +6,7 @@ LLM 服务层 - 封装所有 AI 能力
 - 回答评估（evaluate_answer）
 - 最终报告生成（generate_final_report）
 - 语音转文字（speech_to_text）—— Whisper 全局单例，避免每次重新加载
-- 视频表情分析（analyze_video_expression）—— 调用阿里云百炼 Qwen-VL
+- 视频表情分析（analyze_video_expression）—— DeepSeek 视觉理解
 - 简历分析与优化（analyze_resume / optimize_resume）
 """
 
@@ -26,24 +26,24 @@ import numpy as np
 
 from config.llm_conf import (
     ASR_LANGUAGE,
-    DASHSCOPE_API_KEY,
-    DASHSCOPE_BASE_URL,
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
+    DEEPSEEK_VISION_TIMEOUT,
+    MODEL_VISION,
     PROMPT_EVALUATE_ANSWER,
     PROMPT_FINAL_REPORT,
     PROMPT_GENERATE_QUESTION,
     PROMPT_RESUME_ANALYSIS,
     PROMPT_RESUME_OPTIMIZE,
-    QWEN_VL_MODEL,
-    QWEN_VL_TIMEOUT,
     WHISPER_MODEL_NAME,
     SYSTEM_PROMPT_INTERVIEWER,
     MODEL_INTERVIEW,
     MODEL_REPORT,
     MODEL_RESUME_VL,
     MODEL_RESUME_OPTIMIZE,
-    MODEL_OMNI_INTERVIEW,
     call_llm,
     call_llm_stream,
+    deepseek_extra_body,
 )
 
 logger = logging.getLogger(__name__)
@@ -280,10 +280,19 @@ async def generate_interview_question_stream(
 
 # ==================== 【回答评估】====================
 
+def _strip_json_fence(text: str) -> str:
+    """去掉成对的 markdown 代码围栏。不能用 lstrip('```json')，那会按字符集合误删正文。"""
+    raw = (text or "").strip()
+    fenced = re.match(r"^```(?:json)?\s*([\s\S]*?)\s*```$", raw, flags=re.IGNORECASE)
+    if fenced:
+        return (fenced.group(1) or "").strip()
+    return raw
+
+
 def _llm_json_candidates(text: str) -> list[str]:
     """从 LLM 输出中提取可能的 JSON 子串（与报告解析策略一致）。"""
     candidates: list[str] = []
-    src = (text or "").strip()
+    src = _strip_json_fence(text)
     if not src:
         return candidates
     candidates.append(src)
@@ -305,8 +314,7 @@ def _llm_json_candidates(text: str) -> list[str]:
 
 def _parse_llm_json_dict(text: str) -> tuple[Optional[dict], Optional[Exception]]:
     last_err: Optional[Exception] = None
-    raw = (text or "").strip().lstrip("```json").lstrip("```").rstrip("```").strip()
-    for cand in _llm_json_candidates(raw):
+    for cand in _llm_json_candidates(text):
         try:
             data = json.loads(cand)
             if isinstance(data, dict):
@@ -1067,7 +1075,7 @@ def _extract_frames_via_pyav(video_path: str, max_frames: int = 5) -> list:
 
 async def analyze_video_expression(video_path: str) -> dict:
     """
-    分析视频中的表情和肢体语言（使用阿里云百炼 Qwen-VL）。
+    分析视频中的表情和肢体语言（使用 DeepSeek 视觉模型）。
 
     帧提取策略（优先级）：
       1. 系统 FFmpeg：最可靠，支持所有格式
@@ -1126,7 +1134,7 @@ async def analyze_video_expression(video_path: str) -> dict:
             "视频帧提取失败（建议安装 FFmpeg 或运行 pip install av）"
         )
 
-    logger.info(f"[视频分析] 共提取 {len(frames_data)} 帧，开始 Qwen-VL 分析...")
+    logger.info(f"[视频分析] 共提取 {len(frames_data)} 帧，开始 DeepSeek 画面分析...")
 
     # 并发调用 Qwen-VL 分析所有帧（最多 5 个并发）
     sem = asyncio.Semaphore(3)  # 限制并发避免超 API 限速
@@ -1134,7 +1142,7 @@ async def analyze_video_expression(video_path: str) -> dict:
     async def analyze_one(fd, idx):
         async with sem:
             try:
-                return await _call_qwen_vl_api(fd["image_base64"], fd["timestamp"], idx + 1)
+                return await _analyze_video_frame(fd["image_base64"], fd["timestamp"], idx + 1)
             except Exception as e:
                 logger.warning(f"[视频分析] 第 {idx+1} 帧分析失败：{type(e).__name__}: {e}")
                 return {"expression": "分析失败", "emotion": "neutral", "confidence": 0.3}
@@ -1247,37 +1255,6 @@ def _aggregate_video_analysis(all_analyses: list, duration: float) -> dict:
     }
 
 
-def _resolve_video_frame_model_candidates() -> list[str]:
-    """
-    视频帧分析：优先 qwen3.5-omni-flash（多模态、低延迟），失败再试 Qwen-VL。
-    排除明显不兼容的 realtime 端点模型名。
-    """
-    candidates: list[str] = []
-    omni = (MODEL_OMNI_INTERVIEW or "").strip()
-    if omni and "realtime" not in omni.lower():
-        candidates.append(omni)
-
-    m = (QWEN_VL_MODEL or "").strip()
-    lower = m.lower()
-    if m and "realtime" not in lower:
-        if "omni" in lower and "vl" not in lower:
-            pass
-        else:
-            candidates.append(m)
-
-    for fb in ("qwen-vl-max", "qwen-vl-plus"):
-        if fb not in candidates:
-            candidates.append(fb)
-
-    seen: set[str] = set()
-    ordered: list[str] = []
-    for x in candidates:
-        if x and x not in seen:
-            seen.add(x)
-            ordered.append(x)
-    return ordered
-
-
 def _extract_chat_completion_text(resp_data: dict) -> Optional[str]:
     """从 compatible-mode /chat/completions 响应中取出助手文本。"""
     choices = resp_data.get("choices")
@@ -1298,9 +1275,9 @@ def _extract_chat_completion_text(resp_data: dict) -> Optional[str]:
     return None
 
 
-async def _call_qwen_vl_compatible(image_base64: str, prompt: str, model: str) -> Optional[str]:
-    """优先使用 OpenAI 兼容接口（/v1/chat/completions），与项目内其他 LLM 调用一致。"""
-    url = f"{DASHSCOPE_BASE_URL.rstrip('/')}/chat/completions"
+async def _call_deepseek_vision(image_base64: str, prompt: str, model: str) -> Optional[str]:
+    """deepseek-flash 支持 image_url，输出仍是文本。"""
+    url = f"{DEEPSEEK_BASE_URL.rstrip('/')}/chat/completions"
     body = {
         "model": model,
         "messages": [
@@ -1312,81 +1289,41 @@ async def _call_qwen_vl_compatible(image_base64: str, prompt: str, model: str) -
                 ],
             }
         ],
-        "temperature": 0.1,
-        "max_tokens": 400,
+        "temperature": 0.2,
+        "max_tokens": 500,
+        **deepseek_extra_body(),
     }
-    async with httpx.AsyncClient(timeout=QWEN_VL_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=DEEPSEEK_VISION_TIMEOUT) as client:
         resp = await client.post(
             url,
             headers={
-                "Authorization": f"Bearer {DASHSCOPE_API_KEY}",
+                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
                 "Content-Type": "application/json",
             },
             json=body,
         )
     if resp.status_code != 200:
-        logger.warning(f"[Qwen-VL] compatible 接口 HTTP {resp.status_code}：{resp.text[:400]}")
+        logger.warning(f"[DeepSeek-Vision] HTTP {resp.status_code}：{resp.text[:400]}")
         return None
     data = resp.json()
     text = _extract_chat_completion_text(data)
     if not text:
-        logger.warning(f"[Qwen-VL] compatible 响应无 choices 文本：{str(data)[:500]}")
+        logger.warning(f"[DeepSeek-Vision] 响应无正文：{str(data)[:500]}")
     return text
 
 
-async def _call_qwen_vl_legacy_multimodal(image_base64: str, prompt: str, model: str) -> Optional[str]:
-    """旧版 multimodal-generation（部分账号/模型仍走此通道）。"""
-    request_body = {
-        "model": model,
-        "input": {
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"image": f"base64://{image_base64}"},
-                    {"text": prompt},
-                ],
-            }]
-        },
-        "parameters": {"temperature": 0.1, "max_tokens": 400},
-    }
-    async with httpx.AsyncClient(timeout=QWEN_VL_TIMEOUT) as client:
-        resp = await client.post(
-            "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
-            headers={
-                "Authorization": f"Bearer {DASHSCOPE_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=request_body,
-        )
-    if resp.status_code != 200:
-        logger.warning(f"[Qwen-VL] legacy HTTP {resp.status_code}：{resp.text[:400]}")
-        return None
-    resp_data = resp.json()
-    choices = (
-        resp_data.get("output", {}).get("choices")
-        or resp_data.get("choices")
-    )
-    if not choices:
-        logger.warning(f"[Qwen-VL] legacy 无 choices，完整响应：{resp_data}")
-        return None
-    msg_content = choices[0].get("message", {}).get("content", "")
-    if isinstance(msg_content, list):
-        return next(
-            (item["text"] for item in msg_content if isinstance(item, dict) and "text" in item),
-            None,
-        )
-    if isinstance(msg_content, str):
-        return msg_content
-    return None
+async def _analyze_video_frame(image_base64: str, timestamp: str, frame_index: int) -> dict:
+    """用 DeepSeek 视觉模型分析单帧面试画面。"""
+    logger.info(f"[DeepSeek-Vision] 分析第 {frame_index} 帧（{timestamp}）")
 
-
-async def _call_qwen_vl_api(image_base64: str, timestamp: str, frame_index: int) -> dict:
-    """调用阿里云百炼 Qwen-VL 分析单帧图像（compatible-mode 优先）。"""
-    logger.info(f"[Qwen-VL] 分析第 {frame_index} 帧（{timestamp}）")
-
-    if not DASHSCOPE_API_KEY or DASHSCOPE_API_KEY == "请填写你的阿里云百炼API_KEY":
-        logger.warning("[Qwen-VL] API Key 未配置，返回模拟数据")
-        return {"timestamp": timestamp, "expression": "面带微笑，眼神专注", "emotion": "happy", "confidence": 0.85}
+    if not DEEPSEEK_API_KEY:
+        logger.warning("[DeepSeek-Vision] API Key 未配置")
+        return {
+            "timestamp": timestamp,
+            "expression": "未配置 DeepSeek API Key，无法分析表情",
+            "emotion": "neutral",
+            "confidence": 0.0,
+        }
 
     prompt = """请分析这张面试场景中的人物表情和状态，返回以下 JSON 格式（直接返回 JSON，不要 markdown）：
 {
@@ -1397,42 +1334,29 @@ async def _call_qwen_vl_api(image_base64: str, timestamp: str, frame_index: int)
     "confidence": 0.90
 }"""
 
-    text_content: Optional[str] = None
     try:
-        for model in _resolve_video_frame_model_candidates():
-            text_content = await _call_qwen_vl_compatible(image_base64, prompt, model)
-            if text_content:
-                break
-        if not text_content:
-            text_content = await _call_qwen_vl_legacy_multimodal(image_base64, prompt, "qwen-vl-plus")
+        text_content = await _call_deepseek_vision(image_base64, prompt, MODEL_VISION)
     except httpx.TimeoutException:
-        logger.error("[Qwen-VL] API 请求超时")
-        return {"timestamp": timestamp, "expression": "分析超时", "emotion": "neutral", "confidence": 0.3}
+        logger.error("[DeepSeek-Vision] API 请求超时")
+        return {"timestamp": timestamp, "expression": "分析超时", "emotion": "neutral", "confidence": 0.0}
     except Exception as e:
-        logger.error(f"[Qwen-VL] 请求异常：{e}", exc_info=True)
-        return {"timestamp": timestamp, "expression": "表情分析失败", "emotion": "neutral", "confidence": 0.3}
+        logger.error(f"[DeepSeek-Vision] 请求异常：{e}", exc_info=True)
+        return {"timestamp": timestamp, "expression": "表情分析失败", "emotion": "neutral", "confidence": 0.0}
 
     if not text_content:
-        logger.error("[Qwen-VL] 所有调用路径均未返回文本，已降级")
-        return {"timestamp": timestamp, "expression": "表情分析暂不可用", "emotion": "neutral", "confidence": 0.3}
+        logger.error("[DeepSeek-Vision] 未返回文本")
+        return {"timestamp": timestamp, "expression": "表情分析暂不可用", "emotion": "neutral", "confidence": 0.0}
 
-    try:
-        cleaned = text_content.strip()
-        if "```json" in cleaned:
-            cleaned = cleaned.split("```json")[1].split("```")[0].strip()
-        elif "```" in cleaned:
-            cleaned = cleaned.split("```")[1].strip()
+    parsed, err = _parse_llm_json_dict(text_content)
+    if parsed is None:
+        logger.error(f"[DeepSeek-Vision] JSON 解析失败：{err}，原始：{text_content[:200]}")
+        return {"timestamp": timestamp, "expression": "表情分析失败", "emotion": "neutral", "confidence": 0.0}
 
-        result = json.loads(cleaned)
-        result.setdefault("emotion", "neutral")
-        result.setdefault("confidence", 0.5)
-        result["timestamp"] = timestamp
-
-        logger.info(f"[Qwen-VL] 第 {frame_index} 帧分析成功：{result.get('expression', '')[:30]}")
-        return result
-    except (json.JSONDecodeError, KeyError) as e:
-        logger.error(f"[Qwen-VL] JSON 解析失败：{e}，原始：{text_content[:200]}")
-        return {"timestamp": timestamp, "expression": "表情分析失败", "emotion": "neutral", "confidence": 0.3}
+    parsed.setdefault("emotion", "neutral")
+    parsed.setdefault("confidence", 0.5)
+    parsed["timestamp"] = timestamp
+    logger.info(f"[DeepSeek-Vision] 第 {frame_index} 帧分析成功：{str(parsed.get('expression', ''))[:30]}")
+    return parsed
 
 
 # ==================== 【简历分析与优化】====================
@@ -1456,26 +1380,18 @@ async def analyze_resume(resume_text: str) -> dict:
         model=MODEL_RESUME_VL,
     )
 
-    try:
-        cleaned = result_text.strip()
-        if cleaned.startswith("```"):
-            parts = cleaned.split("```")
-            cleaned = parts[1].strip()
-            if cleaned.startswith("json"):
-                cleaned = cleaned[4:].strip()
-
-        data = json.loads(cleaned)
+    data, err = _parse_llm_json_dict(result_text)
+    if data is not None:
         logger.info(f"[简历分析] 解析成功，技能数：{len(data.get('skills', []))}")
         return data
-    except (json.JSONDecodeError, IndexError) as e:
-        logger.error(f"[简历分析] JSON 解析失败：{e}")
-        return {
-            "basic_info": {"name": "解析失败", "email": "", "phone": ""},
-            "education": [],
-            "experience": [],
-            "projects": [],
-            "skills": [],
-        }
+    logger.error(f"[简历分析] JSON 解析失败：{err}")
+    return {
+        "basic_info": {"name": "解析失败", "email": "", "phone": ""},
+        "education": [],
+        "experience": [],
+        "projects": [],
+        "skills": [],
+    }
 
 
 async def optimize_resume(resume_data: dict) -> dict:
@@ -1491,6 +1407,12 @@ async def optimize_resume(resume_data: dict) -> dict:
     logger.info(f"[简历优化] 原始数据：{len(str(resume_data))} 字符")
 
     newline = "\n"
+
+    def _achievements(raw) -> str:
+        if isinstance(raw, list):
+            return "；".join(str(item).strip() for item in raw if str(item).strip())
+        return str(raw or "")
+
     resume_text = f"""
 基本信息：
 - 姓名：{resume_data.get('basic_info', {}).get('name', '')}
@@ -1501,7 +1423,7 @@ async def optimize_resume(resume_data: dict) -> dict:
 {newline.join([f"- {e.get('school','')} | {e.get('degree','')} | {e.get('major','')} | {e.get('start_date','')} - {e.get('end_date','')}" for e in resume_data.get('education', [])])}
 
 工作经历：
-{newline.join([f"- {e.get('company','')} | {e.get('position','')} | {e.get('start_date','')} - {e.get('end_date','')}{newline}  主要工作：{e.get('achievements','')}" for e in resume_data.get('experience', [])])}
+{newline.join([f"- {e.get('company','')} | {e.get('position','')} | {e.get('start_date','')} - {e.get('end_date','')}{newline}  主要工作：{_achievements(e.get('achievements'))}" for e in resume_data.get('experience', [])])}
 
 项目经验：
 {newline.join([f"- {p.get('name','')} | {p.get('role','')}{newline}  描述：{p.get('description','')}" for p in resume_data.get('projects', [])])}
@@ -1517,17 +1439,9 @@ async def optimize_resume(resume_data: dict) -> dict:
         model=MODEL_RESUME_OPTIMIZE,
     )
 
-    try:
-        cleaned = result_text.strip()
-        if cleaned.startswith("```"):
-            parts = cleaned.split("```")
-            cleaned = parts[1].strip()
-            if cleaned.startswith("json"):
-                cleaned = cleaned[4:].strip()
-
-        optimized = json.loads(cleaned)
+    optimized, err = _parse_llm_json_dict(result_text)
+    if optimized is not None:
         logger.info("[简历优化] 解析成功")
         return optimized
-    except (json.JSONDecodeError, IndexError) as e:
-        logger.warning(f"[简历优化] JSON 解析失败，返回原始数据：{e}")
-        return resume_data
+    logger.warning(f"[简历优化] JSON 解析失败，返回原始数据：{err}")
+    return resume_data

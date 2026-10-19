@@ -331,7 +331,8 @@ async def generate_resume_endpoint(
         if not getattr(user_info, field, None):
             raise HTTPException(status_code=400, detail=f"缺少必要字段：{field}")
 
-    from config.llm_conf import DASHSCOPE_MODEL, call_llm
+    from config.llm_conf import DEEPSEEK_MODEL, call_llm
+    from services.LLM_services import _parse_llm_json_dict
 
     prompt = f"""请根据以下基本信息，生成一份完整的专业简历。
 
@@ -367,14 +368,11 @@ async def generate_resume_endpoint(
     response = await call_llm(
         prompt=prompt,
         system_prompt="你是专业的简历生成专家，擅长根据基本信息生成高质量的专业简历。",
-        model=DASHSCOPE_MODEL,
+        model=DEEPSEEK_MODEL,
     )
 
-    import json, re
-    json_match = re.search(r'\{[\s\S]*\}', response)
-    try:
-        generated_resume = json.loads(json_match.group() if json_match else response)
-    except Exception:
+    generated_resume, _parse_err = _parse_llm_json_dict(response)
+    if generated_resume is None:
         generated_resume = {
             "basic_info": {"name": user_info.name, "email": user_info.email, "phone": user_info.phone or ""},
             "education": list(user_info.education),
