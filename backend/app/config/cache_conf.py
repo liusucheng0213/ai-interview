@@ -1,12 +1,14 @@
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Any, Optional
 
 import redis.asyncio as redis
 from dotenv import load_dotenv
 
-load_dotenv()
+# 无论从仓库哪个目录启动，都读取 backend/.env。
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 logger = logging.getLogger(__name__)
 

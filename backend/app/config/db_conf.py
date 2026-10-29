@@ -1,22 +1,33 @@
 import logging
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import HTTPException
+from sqlalchemy import URL
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
-# 加载环境变量
-load_dotenv()
+# 无论从仓库哪个目录启动，都读取 backend/.env。
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 logger = logging.getLogger(__name__)
 
-# 数据库连接URL
+# 数据库连接 URL。密码必须显式配置，URL.create 会正确处理密码中的特殊字符。
 MYSQL_USER = os.getenv("MYSQL_USER", "root")
-MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "123456")
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD")
+if not MYSQL_PASSWORD:
+    raise RuntimeError("未配置 MYSQL_PASSWORD，请在 backend/.env 中设置数据库密码")
 MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
-MYSQL_PORT = os.getenv("MYSQL_PORT", "3306")
-MYSQL_DB = os.getenv("MYSQL_DB", "test_db")
-MYSQL_URL = f"mysql+aiomysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}"
+MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))
+MYSQL_DB = os.getenv("MYSQL_DB", "ai_interview")
+MYSQL_URL = URL.create(
+    "mysql+aiomysql",
+    username=MYSQL_USER,
+    password=MYSQL_PASSWORD,
+    host=MYSQL_HOST,
+    port=MYSQL_PORT,
+    database=MYSQL_DB,
+)
 MYSQL_POOL_SIZE = int(os.getenv("MYSQL_POOL_SIZE", "20"))
 MYSQL_MAX_OVERFLOW = int(os.getenv("MYSQL_MAX_OVERFLOW", "30"))
 MYSQL_POOL_RECYCLE = int(os.getenv("MYSQL_POOL_RECYCLE", "3600"))

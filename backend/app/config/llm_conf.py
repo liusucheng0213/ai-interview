@@ -8,13 +8,15 @@ DeepSeek 不提供 Embedding，向量检索走本地 bge（见 rag_conf）。
 
 import logging
 import os
+from pathlib import Path
 from typing import AsyncGenerator, Dict, Optional, Tuple
 
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
-load_dotenv()
+# 无论从仓库哪个目录启动，都读取 backend/.env。
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 logger = logging.getLogger(__name__)
 
 # ==================== 环境变量 ====================
