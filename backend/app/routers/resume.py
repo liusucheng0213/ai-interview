@@ -68,10 +68,14 @@ async def upload_resume(
         raise HTTPException(status_code=400, detail="仅支持 PDF 或 Word 格式")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    original_name = (file.filename or "upload.bin").replace(" ", "_")
+    original_name = os.path.basename(file.filename or "upload.bin").replace(" ", "_")
     file_path = os.path.join(UPLOAD_DIR, f"{timestamp}_{original_name}")
 
     content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="文件为空")
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="文件超过 20MB")
     with open(file_path, "wb") as f:
         f.write(content)
 
@@ -135,7 +139,7 @@ async def analyze_resume_endpoint(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "text/plain",
     ]
-    safe_name = (file.filename or "upload.bin").replace(" ", "_").replace("(", "_").replace(")", "_")
+    safe_name = os.path.basename(file.filename or "upload.bin").replace(" ", "_").replace("(", "_").replace(")", "_")
     if file.content_type not in allowed_types and not safe_name.lower().endswith((".pdf", ".doc", ".docx", ".txt")):
         raise HTTPException(status_code=400, detail="仅支持 PDF、Word 或 TXT 格式")
 
@@ -143,6 +147,10 @@ async def analyze_resume_endpoint(
     saved_path = os.path.join(UPLOAD_DIR, f"{timestamp}_{safe_name}")
 
     content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="文件为空")
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="文件超过 20MB")
     with open(saved_path, "wb") as f:
         f.write(content)
 

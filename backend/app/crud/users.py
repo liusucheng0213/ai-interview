@@ -101,14 +101,14 @@ async def get_user_by_token(db: AsyncSession, token: str):
         # 缓存 user_id 对应用户不存在（异常情况），fall through
 
     # 2. 缓存未命中，查询数据库
-    logger.info(f"🔍 从数据库查询 Token {token[:20]}...")
+    logger.info("🔍 从数据库查询用户 Token")
     result = await db.execute(select(UserToken).where(UserToken.token == token))
     db_token = result.scalar_one_or_none()
     if not db_token:
-        logger.info(f"用户 Token 不存在：{token[:20]}...")
+        logger.info("用户 Token 不存在")
         return None
     if db_token.expires_at < datetime.now():
-        logger.info(f"用户 Token 已过期：{token[:20]}...")
+        logger.info("用户 Token 已过期")
         return None
 
     user_result = await db.execute(select(User).where(User.id == db_token.user_id))
