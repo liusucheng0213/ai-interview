@@ -7,7 +7,7 @@
           <p class="home-hero__eyebrow">AI 模拟面试 · 能力提升</p>
           <h1 class="home-hero__title">更专业的练习场，更清晰的成长路径</h1>
           <p class="home-hero__desc">
-            在统一蓝色工作台中完成模拟面试、简历与知识沉淀；社区动态与工具入口并排呈现，结构清晰、留白舒适。
+            在统一蓝色工作台中完成模拟面试、简历与知识沉淀；本地记录与工具入口并排呈现，结构清晰、留白舒适。
           </p>
           <div class="home-hero__actions">
             <button type="button" class="home-hero__btn home-hero__btn--primary" @click="goToInterview('start')">
@@ -50,8 +50,8 @@
 
           <section class="home-feed surface-card" v-loading="loadingPosts">
             <div class="home-section-head">
-              <h2 class="home-section-title">最新动态</h2>
-              <span class="home-section-sub">社区轻分享</span>
+              <h2 class="home-section-title">本地动态</h2>
+              <span class="home-section-sub">仅保存在当前浏览器</span>
             </div>
             <div v-for="post in postList" :key="post.id" class="home-post">
               <div class="home-post__head">
@@ -69,28 +69,22 @@
                 <button type="button" class="home-post__action" @click="likePost(post)">
                   {{ post.is_liked ? '❤️' : '♡' }} {{ post.like_count }}
                 </button>
-                <span class="home-post__action home-post__action--muted">💬 {{ post.comment_count || 0 }}</span>
               </div>
             </div>
-            <div v-if="postList.length === 0 && !loadingPosts" class="home-empty">暂无动态，快来发布第一条吧~</div>
+            <div v-if="postList.length === 0 && !loadingPosts" class="home-empty">暂无本地动态，可在下方记录练习心得。</div>
           </section>
 
           <section class="home-compose surface-card">
             <div class="home-compose__tabs">
-              <button type="button" class="home-tab home-tab--active">发动态</button>
-              <button type="button" class="home-tab" disabled>写文章</button>
-              <button type="button" class="home-tab" disabled>发内推</button>
+              <button type="button" class="home-tab home-tab--active">写记录</button>
             </div>
-            <textarea v-model="postContent" class="home-compose__input" placeholder="此刻你想和大家分享些什么" />
+            <textarea v-model="postContent" class="home-compose__input" placeholder="记录此刻的练习心得" />
             <div class="home-compose__toolbar">
               <div class="home-compose__tools">
-                <span title="表情" aria-hidden="true">&#128522;</span>
                 <span title="图片" aria-hidden="true" @click="triggerImageUpload">&#128247;</span>
-                <span title="打卡" aria-hidden="true">&#128205;</span>
-                <span title="职位" aria-hidden="true">&#128084;</span>
                 <input ref="imageInput" type="file" accept="image/*" multiple style="display: none" @change="handleImageSelect" />
               </div>
-              <button type="button" class="home-publish" @click="handlePublish" :disabled="publishing">发布</button>
+              <button type="button" class="home-publish" @click="handlePublish" :disabled="publishing">保存</button>
             </div>
             <div v-if="selectedImages.length > 0" class="home-previews">
               <div v-for="(img, index) in selectedImages" :key="index" class="home-preview-item">
@@ -101,7 +95,7 @@
           </section>
         </div>
 
-        <!-- 侧栏：工具 + 榜 -->
+        <!-- 侧栏：工具 -->
         <aside class="home-aside">
           <section class="home-tools surface-card">
             <h2 class="home-aside-title">工具箱</h2>
@@ -132,17 +126,6 @@
               </button>
             </div>
           </section>
-
-          <section class="home-rank surface-card" v-loading="loadingRanking">
-            <h2 class="home-aside-title">面试次数榜</h2>
-            <ul class="home-rank__list">
-              <li v-for="(item, index) in rankingList" :key="index" class="home-rank__row">
-                <span class="home-rank__num" :class="`home-rank__num--${index + 1}`">{{ getRankIcon(index) }}</span>
-                <span class="home-rank__name">{{ item.user_name }}</span>
-                <span class="home-rank__count">{{ item.count }} 次</span>
-              </li>
-            </ul>
-          </section>
         </aside>
       </div>
     </div>
@@ -172,7 +155,7 @@
             <h3>2. 功能简介</h3>
             <ul>
               <li><b>核心能力</b>：模拟行业 / 岗位面试、实时语音 / 文字问答、面试评价 / 反馈、错题复盘、简历匹配提问等</li>
-              <li><b>特色功能</b>：岗位定制面试、模拟压力面、面试时长可控、历史面试记录保存等</li>
+              <li><b>特色功能</b>：岗位定制面试、压力型面试官、历史面试记录保存等</li>
             </ul>
           </section>
 
@@ -180,10 +163,10 @@
             <h3>3. 快速上手（核心步骤，新手必看）</h3>
             <p>分步骤写清从打开到完成一次面试的全流程：</p>
             <ol>
-              <li>进入系统，选择登录 / 游客模式</li>
+              <li>注册并登录个人账号</li>
               <li>选择目标行业 / 岗位（如互联网 - 产品经理、金融 - 风控）</li>
-              <li>选择面试类型（常规面 / 压力面 / 专项面），设置面试时长 / 题量</li>
-              <li>开始面试，按提示完成语音 / 文字作答</li>
+              <li>选择面试阶段、场景、难度和面试官风格</li>
+              <li>开始面试，按提示完成文字、语音或视频作答</li>
               <li>面试结束，查看 AI 评价、问题解析、改进建议</li>
             </ol>
           </section>
@@ -201,10 +184,9 @@
           <section class="help-section">
             <h3>5. 常见问题</h3>
             <ul>
-              <li><b>Q: 如何开始第一次面试？</b><br/>A: 点击首页"AI 模拟面试"→选择岗位→设置面试参数→开始面试</li>
-              <li><b>Q: 面试中可以跳过问题吗？</b><br/>A: 可以，建议尽量回答每道题目以获得更准确的评价</li>
+              <li><b>Q: 如何开始第一次面试？</b><br/>A: 点击首页"AI 模拟面试"→选择岗位、面试场景和难度→开始面试</li>
               <li><b>Q: 如何查看历史面试记录？</b><br/>A: 在侧栏进入「面试历史」或「成长轨迹」可查看完整记录与 AI 评价</li>
-              <li><b>Q: 支持语音面试吗？</b><br/>A: 支持，需授权麦克风权限，在面试设置中选择"语音模式"即可</li>
+              <li><b>Q: 支持语音面试吗？</b><br/>A: 支持，需授权麦克风权限，并确保服务端已配置 Whisper 和 FFmpeg</li>
             </ul>
           </section>
 
@@ -229,7 +211,7 @@
 
           <section class="help-section">
             <h3>8. 联系支持</h3>
-            <p>如遇到问题或有建议，请联系技术支持团队。</p>
+            <p>使用问题可在项目仓库查看说明或提交 Issue。</p>
           </section>
 
           <section class="help-section">
@@ -277,8 +259,6 @@ export default {
   name: 'HomePage',
   setup() {
     const router = useRouter()
-    const rankingList = ref([])
-    const loadingRanking = ref(false)
     const showHelp = ref(false)
 
     const postContent = ref('')
@@ -297,12 +277,6 @@ export default {
 
     const goToPositionQuery = () => {
       router.push({ path: '/interview/knowledge', query: { tab: 'position' } })
-    }
-
-    const getRankIcon = (index) => {
-      const medals = [0x1f947, 0x1f948, 0x1f949].map((c) => String.fromCodePoint(c))
-      const m = medals[index] || ''
-      return `${m} ${index + 1}`.trim()
     }
 
     const triggerImageUpload = () => {
@@ -334,7 +308,7 @@ export default {
 
     const handlePublish = async () => {
       if (!postContent.value.trim() && selectedImages.value.length === 0) {
-        notifyWarning('请输入内容或选择图片', '发布动态')
+        notifyWarning('请输入内容或选择图片', '本地动态')
         return
       }
 
@@ -351,22 +325,21 @@ export default {
           images: selectedImages.value.map((img) => img.preview),
           created_at: timeStr,
           like_count: 0,
-          comment_count: 0,
           is_liked: false,
         }
 
         postList.value.unshift(newPost)
         localStorage.setItem('community-posts', JSON.stringify(postList.value))
 
-        notifySuccess('发布成功！', '发布动态')
+        notifySuccess('保存成功！', '本地动态')
         postContent.value = ''
         selectedImages.value = []
         if (imageInput.value) {
           imageInput.value.value = ''
         }
       } catch (error) {
-        console.error('发布失败:', error)
-        notifyError('发布失败，请重试', '发布动态')
+        console.error('保存失败:', error)
+        notifyError('保存失败，请重试', '本地动态')
       } finally {
         publishing.value = false
       }
@@ -389,57 +362,14 @@ export default {
       try {
         const postsStr = localStorage.getItem('community-posts')
         if (postsStr) {
-          postList.value = JSON.parse(postsStr)
-        } else {
-          const currentUser = localStorage.getItem('ai-interview-user') || '匿名用户'
-          const initialPosts = [
-            {
-              id: Date.now(),
-              user_name: currentUser,
-              content: '今天面试表现不错，希望能拿到 offer！',
-              images: [],
-              created_at: '3 月 24 日 10:30',
-              like_count: 5,
-              comment_count: 2,
-              is_liked: false,
-            },
-            {
-              id: Date.now() - 1,
-              user_name: 'Dawn - 长春 - XX 大学',
-              content: '分享一道面试题：说说 Vue 的生命周期',
-              images: [],
-              created_at: '3 月 24 日 09:15',
-              like_count: 12,
-              comment_count: 8,
-              is_liked: true,
-            },
-          ]
-          postList.value = initialPosts
-          localStorage.setItem('community-posts', JSON.stringify(initialPosts))
+          const posts = JSON.parse(postsStr)
+          postList.value = Array.isArray(posts) ? posts : []
         }
       } catch (error) {
         console.error('获取动态失败:', error)
-        notifyError('加载动态失败', '首页动态')
+        notifyError('加载动态失败', '本地动态')
       } finally {
         loadingPosts.value = false
-      }
-    }
-
-    const fetchRanking = async () => {
-      loadingRanking.value = true
-      try {
-        rankingList.value = [
-          { user_name: 'Dawn - 长春 - XX 大学', count: `${String.fromCodePoint(0x1f525)} 15` },
-          { user_name: 'Moss - 长春 - XXXX 大学', count: '10' },
-          { user_name: '小红 - 杭州 - 未知学校', count: '5' },
-          { user_name: 'Genzel - 上海 - 未知学校', count: `${String.fromCodePoint(0x1f44d)} 6` },
-          { user_name: '小张 - 未知 - 未知学校', count: '3' },
-        ]
-      } catch (error) {
-        console.error('获取排行榜失败:', error)
-        notifyError('加载排行榜失败', '面试次数榜')
-      } finally {
-        loadingRanking.value = false
       }
     }
 
@@ -491,7 +421,6 @@ export default {
     }
 
     onMounted(() => {
-      fetchRanking()
       fetchPosts()
       fetchJobOptions()
     })
@@ -499,9 +428,6 @@ export default {
     return {
       goToInterview,
       goToPositionQuery,
-      getRankIcon,
-      rankingList,
-      loadingRanking,
       postContent,
       publishing,
       selectedImages,
@@ -730,8 +656,7 @@ export default {
 
 .home-feed,
 .home-compose,
-.home-tools,
-.home-rank {
+.home-tools {
   padding: clamp(18px, 2.2vw, 24px);
 }
 
@@ -839,10 +764,6 @@ export default {
 
 .home-post__action:hover {
   color: var(--color-primary);
-}
-
-.home-post__action--muted {
-  cursor: default;
 }
 
 .home-empty {
@@ -1061,55 +982,6 @@ export default {
   color: var(--color-text-secondary);
 }
 
-.home-rank__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.home-rank__row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--color-border);
-  font-size: 13px;
-}
-
-.home-rank__row:last-child {
-  border-bottom: none;
-}
-
-.home-rank__num {
-  width: 36px;
-  font-weight: 700;
-  color: var(--color-primary);
-}
-
-.home-rank__num--1 {
-  color: #e11d48;
-}
-.home-rank__num--2 {
-  color: #ea580c;
-}
-.home-rank__num--3 {
-  color: #ca8a04;
-}
-
-.home-rank__name {
-  flex: 1;
-  min-width: 0;
-  color: var(--color-text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-rank__count {
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
 /* 帮助弹窗 */
 .help-modal {
   position: fixed;
@@ -1253,16 +1125,11 @@ export default {
   }
   .home-aside {
     position: static;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
     gap: 16px;
   }
 }
 
 @media (max-width: 640px) {
-  .home-aside {
-    grid-template-columns: 1fr;
-  }
   .home-tools__grid {
     grid-template-columns: 1fr;
   }

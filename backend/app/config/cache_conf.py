@@ -1,19 +1,28 @@
 import json
 import logging
-import os
 from typing import Any, Optional
 
 import redis.asyncio as redis
 from dotenv import load_dotenv
 
+from config.env_util import env_int, env_str
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-REDIS_DB = int(os.getenv("REDIS_DB", "0"))
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD") or None
+# 连接池上限，供单进程本地开发使用
+_REDIS_MAX_CONNECTIONS = 20
+# 建连与读写超时（秒）
+_REDIS_SOCKET_TIMEOUT_SECONDS = 10
+# 调用方未传过期时间时，缓存保留 1 小时
+_DEFAULT_CACHE_TTL_SECONDS = 3600
+
+REDIS_HOST = env_str("REDIS_HOST", "localhost")
+REDIS_PORT = env_int("REDIS_PORT", 6379)
+REDIS_DB = env_int("REDIS_DB", 0)
+# 请配置 REDIS_PASSWORD，获取方式：Redis 的 requirepass，或云厂商控制台；本地无密码请留空
+REDIS_PASSWORD = env_str("REDIS_PASSWORD", "") or None
 
 _pool: Optional[redis.ConnectionPool] = None
 _client: Optional[redis.Redis] = None
@@ -28,9 +37,9 @@ async def init_redis() -> None:
         db=REDIS_DB,
         password=REDIS_PASSWORD,
         decode_responses=True,
-        max_connections=20,
-        socket_connect_timeout=10,
-        socket_timeout=10,
+        max_connections=_REDIS_MAX_CONNECTIONS,
+        socket_connect_timeout=_REDIS_SOCKET_TIMEOUT_SECONDS,
+        socket_timeout=_REDIS_SOCKET_TIMEOUT_SECONDS,
         retry_on_timeout=True,
     )
     _client = redis.Redis(connection_pool=_pool)
@@ -78,7 +87,7 @@ async def get_json_cache(key: str) -> Optional[Any]:
         return None
 
 
-async def set_cache(key: str, value: str, expire: int = 3600) -> bool:
+async def set_cache(key: str, value: str, expire: int = _DEFAULT_CACHE_TTL_SECONDS) -> bool:
     """将字符串值写入 Redis，并设置过期时间（秒）。"""
     try:
         await get_redis().setex(key, expire, value)
@@ -88,7 +97,7 @@ async def set_cache(key: str, value: str, expire: int = 3600) -> bool:
         return False
 
 
-async def set_json_cache(key: str, value: Any, expire: int = 3600) -> bool:
+async def set_json_cache(key: str, value: Any, expire: int = _DEFAULT_CACHE_TTL_SECONDS) -> bool:
     """将可 JSON 序列化的值写入 Redis，并设置过期时间（秒）。"""
     try:
         serialized = json.dumps(value, ensure_ascii=False)

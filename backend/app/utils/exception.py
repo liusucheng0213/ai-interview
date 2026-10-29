@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import traceback
 from typing import Optional
 
@@ -10,10 +9,12 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from config.env_util import env_str
+
 logger = logging.getLogger(__name__)
 
 # 从环境变量读取 DEBUG 模式（生产环境设为 False）
-DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() in ("true", "1", "yes")
+DEBUG_MODE = env_str("DEBUG_MODE", "False").lower() in ("true", "1", "yes")
 
 
 async def http_exception_handler(request: Request, exc: HTTPException):

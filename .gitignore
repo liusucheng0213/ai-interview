@@ -1,19 +1,10 @@
-
-# --------------------------
-# 1. 依赖与包管理
-# --------------------------
+# 依赖与包管理
 node_modules/
 .pnpm-store/
-frontend/node_modules/
+.vite/
+.npm/
 
-# 锁文件建议纳入版本控制，按团队实际策略开启
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
-
-# --------------------------
-# 2. 前端构建产物
-# --------------------------
+# 前端构建产物
 dist/
 dist-ssr/
 build/
@@ -22,24 +13,21 @@ build/
 .next/
 .astro/
 
-# --------------------------
-# 3. 环境变量（绝对不能上传）
-# --------------------------
+# 环境变量与本地密钥。保留 *.env.example
 .env
-.env.example.local
-.env.local
-.env.development
-.env.production
-.env.test
-.env.*.local
-backend/.env
-frontend/.env
-frontend/.env.local
-frontend/.env.*.local
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+secrets.json
 
-# --------------------------
-# 4. 日志文件
-# --------------------------
+# 日志
 logs/
 *.log
 npm-debug.log*
@@ -48,75 +36,74 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# --------------------------
-# 5. 后端运行时文件
-# --------------------------
-uploads/
-backend/app/uploads/
-files/
-static/files/
-temp/
-tmp/
-# 按用户 ID 存放的知识库原文，属于本地上传数据
-backend/app/storage/
-*.pid
-*.seed
-*.pid.lock
-
-# --------------------------
-# 5.1 Python / FastAPI 运行与构建
-# --------------------------
+# Python 缓存、虚拟环境、打包产物
 __pycache__/
 *.py[cod]
 *$py.class
 .Python
 .python-version
-
-# 虚拟环境
 venv/
 .venv/
 env/
 ENV/
-backend/venv/
-backend/.venv/
-
-# Python 打包产物
+*.egg
 *.egg-info/
 .eggs/
 pip-wheel-metadata/
-
-# 测试与类型检查缓存
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .hypothesis/
+.tox/
+.nox/
 .coverage
 .coverage.*
 htmlcov/
+.ipynb_checkpoints/
 
-# --------------------------
-# 6. 数据库文件
-# --------------------------
+# 运行时数据、上传文件、数据库
+uploads/
+backend/app/uploads/
+backend/app/storage/
+files/
+static/files/
+temp/
+tmp/
+*.pid
+*.seed
+*.pid.lock
 *.db
 *.sqlite
 *.sqlite3
-prisma/dev.db
-prisma/migrations/*.db
 data/
 dump/
 backup/
+*.bak
+*.orig
+*~
 
-# --------------------------
-# 6.1 向量库与模型缓存
-# --------------------------
+# 向量库与模型权重（体积大，不入库）
 backend/app/chroma_db/
 backend/chroma_db/
 chroma_db/
 **/models_rag/
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.gguf
+*.ckpt
+*.h5
 
-# --------------------------
-# 7. 编辑器 / IDE 配置
-# --------------------------
+# 压缩包与备份
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+
+# IDE
 .idea/
 .vscode/
 *.sublime-project
@@ -124,33 +111,18 @@ chroma_db/
 *.swp
 *.swo
 
-# --------------------------
-# 8. 系统垃圾文件
-# --------------------------
+# 操作系统垃圾文件
 .DS_Store
 Thumbs.db
+Desktop.ini
+ehthumbs.db
 $RECYCLE.BIN/
 
-# --------------------------
-# 9. 测试 / 覆盖率
-# --------------------------
+# 测试覆盖率
 coverage/
 .nyc_output/
 
-# --------------------------
-# 10. 其他缓存
-# --------------------------
+# 其他缓存
 .cache/
 .parcel-cache/
 .temp/
-
-# --------------------------
-# 11. 密钥与证书
-# --------------------------
-*.pem
-*.key
-*.crt
-*.p12
-*.pfx
-credentials.json
-service-account*.json

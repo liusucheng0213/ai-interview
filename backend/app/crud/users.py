@@ -12,6 +12,9 @@ from utils.security import get_hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 
+# 登录令牌有效天数。缓存默认 TTL 与此一致（见 cache/users.py）
+TOKEN_EXPIRE_DAYS = 7
+
 
 async def get_user_by_username(db: AsyncSession, username: str):
     logger.info(f"🔍 从数据库查询用户 {username}")
@@ -45,7 +48,7 @@ async def create_user(db: AsyncSession, user_data: UserRegisterRequest):
 async def create_or_update_token(db: AsyncSession, user_id: int):
     """生成或更新用户 Token，并同步写入 Redis 缓存。"""
     token = str(uuid.uuid4())
-    expires_at = datetime.now() + timedelta(days=7)
+    expires_at = datetime.now() + timedelta(days=TOKEN_EXPIRE_DAYS)
 
     result = await db.execute(select(UserToken).where(UserToken.user_id == user_id))
     user_token = result.scalar_one_or_none()

@@ -1,21 +1,12 @@
 <template>
   <div class="footer-container">
     <div class="footer-content">
-      <!-- 第一行：标题和链接 -->
+      <!-- 第一行：标题 -->
       <div class="footer-top">
         <div class="site-info">
           <span class="site-name">AI 模拟面试中心</span>
           <span class="divider">|</span>
           <span class="slogan">让 AI 成为你的专属面试教练</span>
-        </div>
-        <div class="footer-links">
-          <a href="#" class="footer-link">关于我们</a>
-          <span class="link-divider">|</span>
-          <a href="#" class="footer-link">联系我们</a>
-          <span class="link-divider">|</span>
-          <a href="#" class="footer-link">使用帮助</a>
-          <span class="link-divider">|</span>
-          <a href="#" class="footer-link">用户协议</a>
         </div>
       </div>
       
@@ -25,7 +16,7 @@
         <span class="divider">|</span>
         <span class="tech-stack">技术支持：FastAPI + Vue 3 + MySQL</span>
         <span class="divider">|</span>
-        <a href="https://github.com/xxx" target="_blank" class="github-link">项目仓库</a>
+        <a href="https://github.com/liusucheng0213/ai-interview" target="_blank" rel="noopener noreferrer" class="github-link">项目仓库</a>
       </div>
     </div>
   </div>
@@ -82,26 +73,6 @@
   margin: 0 8px;
 }
 
-.footer-links {
-  text-align: center;
-}
-
-.footer-link {
-  color: #8a9cae;
-  text-decoration: none;
-  font-size: 12px;
-  transition: color 0.3s;
-}
-
-.footer-link:hover {
-  color: #4299e1;
-}
-
-.link-divider {
-  color: #b8d0e8;
-  margin: 0 6px;
-}
-
 .footer-bottom {
   text-align: center;
   padding-top: 12px;
@@ -131,10 +102,6 @@
   
   .site-info {
     font-size: 12px;
-  }
-  
-  .footer-links {
-    font-size: 11px;
   }
   
   .footer-bottom {

@@ -19,6 +19,9 @@ from utils.security import get_hash_password
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/company", tags=["company"])
 
+# 企业端重置密码的最短长度（字符）
+MIN_RESET_PASSWORD_LENGTH = 6
+
 
 def _ensure_enterprise(user: User) -> None:
     if getattr(user, "account_type", "personal") != "enterprise":
@@ -110,8 +113,11 @@ async def reset_user_password(
     user: User = Depends(get_current_user),
 ):
     _ensure_enterprise(user)
-    if not new_password or len(new_password) < 6:
-        raise HTTPException(status_code=400, detail="新密码长度至少 6 位")
+    if not new_password or len(new_password) < MIN_RESET_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"新密码长度至少 {MIN_RESET_PASSWORD_LENGTH} 位",
+        )
 
     target = await db.get(User, target_user_id)
     if not target:

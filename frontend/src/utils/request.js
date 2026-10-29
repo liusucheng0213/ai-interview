@@ -3,9 +3,12 @@ import router from '@/router'
 import { notifyError } from '@/utils/appNotify'
 // 业务错误（4xx/5xx）由各请求的 catch 统一用 appNotify 展示，避免与拦截器重复弹窗
 
+// 与后端 DEEPSEEK_TIMEOUT 默认 120 秒对齐，覆盖面试流式与报告生成
+const REQUEST_TIMEOUT_MS = 120000
+
 const service = axios.create({
   baseURL: '/api',  // 🌟 使用相对路径，配合 vite 代理
-  timeout: 120000,
+  timeout: REQUEST_TIMEOUT_MS,
   // 跨域请求携带 cookie（如果后端需要）
   withCredentials: true
 })

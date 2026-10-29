@@ -1,10 +1,10 @@
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from config.env_util import env_str
 from config.logger_conf import setup_logging, logging
 
 setup_logging()
@@ -64,7 +64,7 @@ app = FastAPI(
 
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
-cors_origins_raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+cors_origins_raw = env_str("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,

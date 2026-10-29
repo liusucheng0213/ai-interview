@@ -43,14 +43,19 @@ export default defineConfig({
       rollupOptions: {
         output: {
           // 手动分割 vendor chunk，避免单包过大
-          manualChunks: {
-            // Vue 核心运行时
-            'vue-vendor': ['vue', 'vue-router'],
-            // Element Plus 单独打包（体积最大）
-            'element-plus': ['element-plus'],
-            // HTTP 客户端
-            'axios': ['axios'],
-            'flv': ['flv.js'],
+          manualChunks(id) {
+            if (id.includes('node_modules/vue/') || id.includes('node_modules/vue-router/')) {
+              return 'vue-vendor'
+            }
+            if (id.includes('node_modules/element-plus/')) {
+              return 'element-plus'
+            }
+            if (id.includes('node_modules/axios/')) {
+              return 'axios'
+            }
+            if (id.includes('node_modules/flv.js/')) {
+              return 'flv'
+            }
           },
         },
       },

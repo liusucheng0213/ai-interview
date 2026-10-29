@@ -13,7 +13,6 @@ import binascii
 import hashlib
 import hmac
 import logging
-import os
 from datetime import datetime, timezone
 from email.utils import format_datetime
 from typing import Any, Dict, Optional
@@ -21,29 +20,35 @@ from urllib.parse import urlencode
 
 import httpx
 
+from config.env_util import env_int, env_raw, env_str
+
 logger = logging.getLogger(__name__)
 
-IFLYTEK_APP_ID = os.getenv("IFLYTEK_APP_ID", "").strip()
-IFLYTEK_API_KEY = os.getenv("IFLYTEK_API_KEY", "").strip()
-IFLYTEK_API_SECRET = os.getenv("IFLYTEK_API_SECRET", "").strip()
-IFLYTEK_VH_AVATAR_ID = os.getenv("IFLYTEK_VH_AVATAR_ID", "111204007").strip()
-IFLYTEK_VH_WIDTH = int(os.getenv("IFLYTEK_VH_WIDTH", "720") or 720)
-IFLYTEK_VH_HEIGHT = int(os.getenv("IFLYTEK_VH_HEIGHT", "1280") or 1280)
-IFLYTEK_VH_PROTOCOL = os.getenv("IFLYTEK_VH_STREAM_PROTOCOL", "rtmp").strip()  # 或 xrtc
-IFLYTEK_VH_TTS_VCN = os.getenv("IFLYTEK_VH_TTS_VCN", "x4_yezi").strip()
-IFLYTEK_VH_TTS_AUE = os.getenv("IFLYTEK_VH_TTS_AUE", "lame").strip()  # lame/mp3 或 raw
-IFLYTEK_VH_TTS_AUDIO_ENCODING = os.getenv("IFLYTEK_VH_TTS_AUDIO_ENCODING", "mp3").strip()
-IFLYTEK_VH_BG_RES_KEY = os.getenv("IFLYTEK_VH_BG_RES_KEY", "").strip()
-IFLYTEK_VH_HOST = os.getenv("IFLYTEK_VH_HOST", "vms.cn-huadong-1.xf-yun.com").strip()
-IFLYTEK_VH_SCENE_ID = os.getenv("IFLYTEK_VH_SCENE_ID", "2").strip()
-IFLYTEK_VH_INTERACT_SERVER_URL = os.getenv(
+# TODO: 配置你的 IFLYTEK_APP_ID，获取方式：https://console.xfyun.cn/app/myapp
+IFLYTEK_APP_ID = env_str("IFLYTEK_APP_ID", "")
+# TODO: 配置你的 IFLYTEK_API_KEY，获取方式：https://console.xfyun.cn/app/myapp
+IFLYTEK_API_KEY = env_str("IFLYTEK_API_KEY", "")
+# TODO: 配置你的 IFLYTEK_API_SECRET，获取方式：https://console.xfyun.cn/app/myapp
+IFLYTEK_API_SECRET = env_str("IFLYTEK_API_SECRET", "")
+IFLYTEK_VH_AVATAR_ID = env_str("IFLYTEK_VH_AVATAR_ID", "111204007")
+IFLYTEK_VH_WIDTH = env_int("IFLYTEK_VH_WIDTH", 720)
+IFLYTEK_VH_HEIGHT = env_int("IFLYTEK_VH_HEIGHT", 1280)
+IFLYTEK_VH_PROTOCOL = env_str("IFLYTEK_VH_STREAM_PROTOCOL", "rtmp")  # 或 xrtc
+IFLYTEK_VH_TTS_VCN = env_str("IFLYTEK_VH_TTS_VCN", "x4_yezi")
+IFLYTEK_VH_TTS_AUE = env_str("IFLYTEK_VH_TTS_AUE", "lame")  # lame/mp3 或 raw
+IFLYTEK_VH_TTS_AUDIO_ENCODING = env_str("IFLYTEK_VH_TTS_AUDIO_ENCODING", "mp3")
+IFLYTEK_VH_BG_RES_KEY = env_str("IFLYTEK_VH_BG_RES_KEY", "")
+IFLYTEK_VH_HOST = env_str("IFLYTEK_VH_HOST", "vms.cn-huadong-1.xf-yun.com")
+# 键不存在时仍是历史占位值 "2"。若 .env 里写了空值，则保持为空，避免把占位值写回去。
+IFLYTEK_VH_SCENE_ID = env_raw("IFLYTEK_VH_SCENE_ID", "2")
+IFLYTEK_VH_INTERACT_SERVER_URL = env_str(
     "IFLYTEK_VH_INTERACT_SERVER_URL", "wss://avatar.cn-huadong-1.xf-yun.com/v1/interact"
-).strip()
-IFLYTEK_VH_SYNC_MODE = int(os.getenv("IFLYTEK_VH_SYNC_MODE", "1") or 1)  # 1=音频驱动口型
-IFLYTEK_VH_HAS_AUDIO = (os.getenv("IFLYTEK_VH_HAS_AUDIO", "true").strip().lower() in ("1", "true", "yes"))
-IFLYTEK_VH_VIDEO_TYPE = os.getenv("IFLYTEK_VH_VIDEO_TYPE", "lip_sync").strip()
+)
+IFLYTEK_VH_SYNC_MODE = env_int("IFLYTEK_VH_SYNC_MODE", 1)  # 1=音频驱动口型
+IFLYTEK_VH_HAS_AUDIO = env_str("IFLYTEK_VH_HAS_AUDIO", "true").lower() in ("1", "true", "yes")
+IFLYTEK_VH_VIDEO_TYPE = env_str("IFLYTEK_VH_VIDEO_TYPE", "lip_sync")
 # vms2d_* 协议头 uid：须为讯飞「用户服务」返回的 uid；无则留空。传业务库 user_id 会触发 SUBID_xxx_数字 校验失败（11203）。
-IFLYTEK_VH_REQUEST_UID = os.getenv("IFLYTEK_VH_REQUEST_UID", "").strip()
+IFLYTEK_VH_REQUEST_UID = env_str("IFLYTEK_VH_REQUEST_UID", "")
 
 # 内存会话：user_id -> { session, stream_hint }
 _vh_sessions: Dict[int, Dict[str, Any]] = {}

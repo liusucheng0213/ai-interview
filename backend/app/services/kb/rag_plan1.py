@@ -8,7 +8,6 @@ import asyncio
 import csv
 import hashlib
 import io
-import os
 import re
 import time
 import uuid
@@ -21,6 +20,7 @@ import chromadb
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config.env_util import env_int, env_str
 from config.llm_conf import MODEL_KNOWLEDGE_GRAPH, call_llm
 from models.rag_schema import Document, DocumentChunk
 from services.kb.chroma_child import query_children
@@ -30,11 +30,11 @@ try:
 except Exception:
     RecursiveCharacterTextSplitter = None
 
-RAG_COLLECTION_NAME = os.getenv("RAG_COLLECTION_NAME", "interview_rag")
-EMBED_MODEL_NAME = os.getenv("RAG_EMBED_MODEL_NAME", "text-embedding-3-small")
-RERANK_TOP_K = int(os.getenv("RAG_RERANK_TOP_N", "3") or 3)
-RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5") or 5)
-RAG_RETRIEVE_CACHE_TTL = int(os.getenv("RAG_RETRIEVE_CACHE_TTL", "60") or 60)
+RAG_COLLECTION_NAME = env_str("RAG_COLLECTION_NAME", "interview_rag")
+EMBED_MODEL_NAME = env_str("RAG_EMBED_MODEL_NAME", "text-embedding-3-small")
+RERANK_TOP_K = env_int("RAG_RERANK_TOP_N", 3)
+RAG_TOP_K = env_int("RAG_TOP_K", 5)
+RAG_RETRIEVE_CACHE_TTL = env_int("RAG_RETRIEVE_CACHE_TTL", 60)
 _embedding_cache: Dict[str, List[float]] = {}
 _retrieve_cache: Dict[str, Dict[str, Any]] = {}
 
@@ -347,7 +347,7 @@ async def save_to_mysql(
 
 
 def init_chroma_collection() -> Any:
-    client = chromadb.PersistentClient(path=os.getenv("CHROMA_DB_PATH", "./chroma_db"))
+    client = chromadb.PersistentClient(path=env_str("CHROMA_DB_PATH", "./chroma_db"))
     return client.get_or_create_collection(
         name=RAG_COLLECTION_NAME,
         metadata={"hnsw:space": "cosine"},
@@ -807,7 +807,7 @@ def _rerank_items(query: str, items: List[Dict[str, Any]]) -> List[Dict[str, Any
     try:
         from FlagEmbedding import FlagReranker  # type: ignore
 
-        model_name = os.getenv("RAG_RERANK_MODEL", "BAAI/bge-reranker-base")
+        model_name = env_str("RAG_RERANK_MODEL", "BAAI/bge-reranker-base")
         reranker = FlagReranker(model_name, use_fp16=False)
         pairs = [[query, i.get("content", "")] for i in items]
         scores = reranker.compute_score(pairs)

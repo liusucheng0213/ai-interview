@@ -6,17 +6,20 @@ from typing import Optional
 
 import chromadb
 
+from config.env_util import env_int, env_str
+
 logger = logging.getLogger(__name__)
 
-MODEL_DIMENSION = int(os.getenv("RAG_EMBEDDING_DIMENSION", "512"))
+MODEL_DIMENSION = env_int("RAG_EMBEDDING_DIMENSION", 512)
 # bge-small-zh-v1.5 的向量维度是 512。云端 1024 维向量不能和它混在同一个集合里。
-EMBEDDING_MODEL_PATH = os.getenv(
+EMBEDDING_MODEL_PATH = env_str(
     "RAG_LOCAL_EMBEDDING_MODEL_PATH",
     "./models_rag/bge-small-zh-v1.5",
 )
+# 子块集合固定使用这个相对路径。CHROMA_DB_PATH 只作用于 rag_plan1 的另一套集合。
 CHROMA_DB_PATH = "./chroma_db"
-CHILD_COLLECTION_NAME = os.getenv("CHROMA_CHILD_COLLECTION_NAME", "kb_child_chunks")
-if os.getenv("RAG_USE_DASHSCOPE_EMBEDDING", "").lower() in ("1", "true", "yes"):
+CHILD_COLLECTION_NAME = env_str("CHROMA_CHILD_COLLECTION_NAME", "kb_child_chunks")
+if env_str("RAG_USE_DASHSCOPE_EMBEDDING", "").lower() in ("1", "true", "yes"):
     logger.warning(
         "已忽略 RAG_USE_DASHSCOPE_EMBEDDING：DeepSeek 不提供向量接口，知识库改用本地 bge-small-zh。"
         "若之前用过云端向量，请重新上传知识库。"

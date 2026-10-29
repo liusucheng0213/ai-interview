@@ -17,9 +17,13 @@ if len(sys.argv) > 1 and sys.argv[1].strip():
 from services import iflytek_virtual_human as vh  # noqa: E402
 
 
+# 自检专用用户编号，不对应业务库里的真实用户
+_SMOKE_TEST_USER_ID = 99999
+
+
 async def main() -> None:
     try:
-        r = await vh.vms_start(99999)
+        r = await vh.vms_start(_SMOKE_TEST_USER_ID)
         sess = (r.get("session") or "")[:40]
         url = (r.get("stream_url") or "")[:80]
         print("vms_start OK session_prefix=", sess, "stream=", url)

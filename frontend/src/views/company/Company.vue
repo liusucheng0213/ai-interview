@@ -402,7 +402,7 @@ onMounted(async () => {
   opacity: 0.92;
   font-weight: 400;
 }
-.pwd-form :deep(.el-form-item__label) {
+.pwd-form .el-form-item__label {
   font-weight: 600;
   color: var(--el-text-color-primary);
 }

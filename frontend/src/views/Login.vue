@@ -41,7 +41,6 @@
                       <input type="checkbox" id="remember">
                       <label for="remember">记住我</label>
                     </div>
-                    <a href="#" class="forgot-link">忘记密码？</a>
                   </el-form-item>
                   <el-form-item>
                     <el-button type="primary" native-type="submit" class="login-btn">登 录</el-button>
@@ -462,18 +461,6 @@ const handleRegister = async () => {
 .remember-me input {
   accent-color: #2055c7;
   cursor: pointer;
-}
-
-.forgot-link {
-  color: #2055c7;
-  text-decoration: none;
-  font-size: 13px;
-  transition: color 0.2s;
-}
-
-.forgot-link:hover {
-  color: #1a3a9e;
-  text-decoration: underline;
 }
 
 .login-btn {

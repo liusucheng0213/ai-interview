@@ -24,6 +24,7 @@ import cv2
 import httpx
 import numpy as np
 
+from config.env_util import env_int
 from config.llm_conf import (
     ASR_LANGUAGE,
     DEEPSEEK_API_KEY,
@@ -49,8 +50,8 @@ from config.llm_conf import (
 logger = logging.getLogger(__name__)
 
 # 提问环节对话上下文上限（字符）；超出则只保留最近若干轮完整问答，降低 Token
-_INTERVIEW_CONTEXT_MAX_CHARS = int(os.getenv("INTERVIEW_CONTEXT_MAX_CHARS", "5200"))
-_INTERVIEW_CONTEXT_MAX_PAIRS = int(os.getenv("INTERVIEW_CONTEXT_MAX_PAIRS", "8"))
+_INTERVIEW_CONTEXT_MAX_CHARS = env_int("INTERVIEW_CONTEXT_MAX_CHARS", 5200)
+_INTERVIEW_CONTEXT_MAX_PAIRS = env_int("INTERVIEW_CONTEXT_MAX_PAIRS", 8)
 
 
 def _safe_parse_duration_seconds(raw: str) -> float:

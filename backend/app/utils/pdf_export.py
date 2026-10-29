@@ -6,6 +6,8 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
+from config.env_util import env_str
+
 logger = logging.getLogger(__name__)
 
 _FONT_REGISTERED = False
@@ -20,10 +22,11 @@ def _ensure_cn_font() -> str:
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
 
-        env_path = os.environ.get("PDF_CN_FONT", "").strip()
+        env_path = env_str("PDF_CN_FONT", "")
         candidates = []
         if env_path and os.path.isfile(env_path):
             candidates.append(env_path)
+        # 操作系统自带字体，不是某台电脑的用户目录。可用 PDF_CN_FONT 覆盖。
         candidates.extend(
             [
                 r"C:\Windows\Fonts\msyh.ttc",

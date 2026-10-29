@@ -7,22 +7,24 @@ DeepSeek 不提供 Embedding，向量检索走本地 bge（见 rag_conf）。
 """
 
 import logging
-import os
 from typing import AsyncGenerator, Dict, Optional, Tuple
 
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
+from config.env_util import env_int, env_str
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
 # ==================== 环境变量 ====================
-DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "").strip()
-DEEPSEEK_BASE_URL: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
-DEEPSEEK_TIMEOUT: int = int(os.getenv("DEEPSEEK_TIMEOUT", "120"))
-DEEPSEEK_MODEL: str = os.getenv("DEEPSEEK_MODEL", "deepseek-flash").strip() or "deepseek-flash"
-DEEPSEEK_THINKING: bool = os.getenv("DEEPSEEK_THINKING", "disabled").strip().lower() in (
+# 请配置 DEEPSEEK_API_KEY，获取方式：https://platform.deepseek.com/api_keys
+DEEPSEEK_API_KEY: str = env_str("DEEPSEEK_API_KEY", "")
+DEEPSEEK_BASE_URL: str = env_str("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
+DEEPSEEK_TIMEOUT: int = env_int("DEEPSEEK_TIMEOUT", 120)
+DEEPSEEK_MODEL: str = env_str("DEEPSEEK_MODEL", "deepseek-flash")
+DEEPSEEK_THINKING: bool = env_str("DEEPSEEK_THINKING", "disabled").lower() in (
     "1",
     "true",
     "yes",
@@ -32,7 +34,7 @@ DEEPSEEK_THINKING: bool = os.getenv("DEEPSEEK_THINKING", "disabled").strip().low
 
 
 def _env_model(name: str, default: str) -> str:
-    return os.getenv(name, default).strip() or default
+    return env_str(name, default)
 
 
 MODEL_INTERVIEW: str = _env_model("DEEPSEEK_MODEL_INTERVIEW", DEEPSEEK_MODEL)
@@ -41,10 +43,10 @@ MODEL_RESUME_VL: str = _env_model("DEEPSEEK_MODEL_RESUME", DEEPSEEK_MODEL)
 MODEL_RESUME_OPTIMIZE: str = _env_model("DEEPSEEK_MODEL_RESUME_OPTIMIZE", DEEPSEEK_MODEL)
 MODEL_KNOWLEDGE_GRAPH: str = _env_model("DEEPSEEK_MODEL_KNOWLEDGE", DEEPSEEK_MODEL)
 MODEL_VISION: str = _env_model("DEEPSEEK_MODEL_VISION", DEEPSEEK_MODEL)
-DEEPSEEK_VISION_TIMEOUT: int = int(os.getenv("DEEPSEEK_VISION_TIMEOUT", "60"))
+DEEPSEEK_VISION_TIMEOUT: int = env_int("DEEPSEEK_VISION_TIMEOUT", 60)
 
-WHISPER_MODEL_NAME: str = os.getenv("WHISPER_MODEL_NAME", "small")
-ASR_LANGUAGE: str = os.getenv("ASR_LANGUAGE", "zh")
+WHISPER_MODEL_NAME: str = env_str("WHISPER_MODEL_NAME", "small")
+ASR_LANGUAGE: str = env_str("ASR_LANGUAGE", "zh")
 
 _api_key_ok = bool(DEEPSEEK_API_KEY)
 if not _api_key_ok:

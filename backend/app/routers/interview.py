@@ -30,6 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.db_conf import get_db
+from config.env_util import env_int
 from crud.history import (
     create_history,
     add_content_history,
@@ -1384,7 +1385,7 @@ async def upload_video_stream(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """接收视频流分片，当前仅做缓冲（TODO：实时分析）"""
+    """接收视频流分片并缓冲，当前版本不进行实时分析。"""
     logger.info(f"[视频流] 收到分片，chunk={chunk}，大小：{file.size} bytes")
     return {"success": True, "message": "视频片段接收成功"}
 
@@ -1971,9 +1972,9 @@ async def get_growth_advice(
     import time as _time
 
     t0 = _time.perf_counter()
-    max_samples = int(os.getenv("GROWTH_ADVICE_MAX_SAMPLES", "24"))
-    llm_timeout_main = int(os.getenv("GROWTH_ADVICE_LLM_TIMEOUT", "45"))
-    llm_timeout_retry = int(os.getenv("GROWTH_ADVICE_LLM_RETRY_TIMEOUT", "25"))
+    max_samples = env_int("GROWTH_ADVICE_MAX_SAMPLES", 24)
+    llm_timeout_main = env_int("GROWTH_ADVICE_LLM_TIMEOUT", 45)
+    llm_timeout_retry = env_int("GROWTH_ADVICE_LLM_RETRY_TIMEOUT", 25)
 
     # 获取该用户全部历史评估记录
     history_list = await get_user_history(user, job_id, db)

@@ -1,9 +1,11 @@
 import logging
-import os
 
 from dotenv import load_dotenv
 from fastapi import HTTPException
+from sqlalchemy import URL
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+from config.env_util import env_int, env_str
 
 # 加载环境变量
 load_dotenv()
@@ -11,16 +13,24 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # 数据库连接URL
-MYSQL_USER = os.getenv("MYSQL_USER", "root")
-MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "123456")
-MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
-MYSQL_PORT = os.getenv("MYSQL_PORT", "3306")
-MYSQL_DB = os.getenv("MYSQL_DB", "test_db")
-MYSQL_URL = f"mysql+aiomysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}"
-MYSQL_POOL_SIZE = int(os.getenv("MYSQL_POOL_SIZE", "20"))
-MYSQL_MAX_OVERFLOW = int(os.getenv("MYSQL_MAX_OVERFLOW", "30"))
-MYSQL_POOL_RECYCLE = int(os.getenv("MYSQL_POOL_RECYCLE", "3600"))
-MYSQL_POOL_TIMEOUT = int(os.getenv("MYSQL_POOL_TIMEOUT", "30"))
+MYSQL_USER = env_str("MYSQL_USER", "root")
+# 请配置 MYSQL_PASSWORD，获取方式：MySQL 安装时为本账户设置的密码，或云数据库控制台的账号页面
+MYSQL_PASSWORD = env_str("MYSQL_PASSWORD", "")
+MYSQL_HOST = env_str("MYSQL_HOST", "localhost")
+MYSQL_PORT = env_int("MYSQL_PORT", 3306)
+MYSQL_DB = env_str("MYSQL_DB", "test_db")
+MYSQL_URL = URL.create(
+    "mysql+aiomysql",
+    username=MYSQL_USER,
+    password=MYSQL_PASSWORD,
+    host=MYSQL_HOST,
+    port=MYSQL_PORT,
+    database=MYSQL_DB,
+)
+MYSQL_POOL_SIZE = env_int("MYSQL_POOL_SIZE", 20)
+MYSQL_MAX_OVERFLOW = env_int("MYSQL_MAX_OVERFLOW", 30)
+MYSQL_POOL_RECYCLE = env_int("MYSQL_POOL_RECYCLE", 3600)
+MYSQL_POOL_TIMEOUT = env_int("MYSQL_POOL_TIMEOUT", 30)
 
 # 创建异步引擎（生产环境关闭echo）
 async_engine = create_async_engine(
